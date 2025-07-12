@@ -12,8 +12,8 @@
 
 #define VS1053_INITIALVOLUME 95
 #define VS1053_ICY_METADATA true
-#define VS1053_CONNECT_TIMEOUT_MS 250
-#define VS1053_CONNECT_TIMEOUT_MS_SSL 750
+#define VS1053_CONNECT_TIMEOUT_MS 10000
+#define VS1053_CONNECT_TIMEOUT_MS_SSL 10000
 #define VS1053_NOBUFFER_TIMEOUT_MS 900
 #define VS1053_MAX_PLAYLIST_READ 1024
 #define VS1053_MAX_URL_LENGTH 256
@@ -23,12 +23,27 @@
 #define VS1053_PSRAM_BUFFER_SIZE size_t(1024 * 64)
 #define VS1053_PSRAM_MAX_MOVE size_t(1024 * 4)
 
+// possible connect result types enumeration
+#define FAIL_INVALID_URL 1000
+#define FAIL_HTTP_CLIENT 1001
+#define FAIL_CONNECTING  1002 
+#define FAIL_PLAYLIST_CANT_REDIRECT 1003
+#define FAIL_NO_STREAM_HANDLE 1004
+#define FAIL_PLAYLIST_NO_DATA 1005
+#define FAIL_PLAYLIST_NO_URL 1006
+#define FAIL_UNSUPPORTED_MIME 1007
+#define FAIL_CANT_REDIRECT 1008
+
+
+
+
 #define VS1053_MAXVOLUME uint8_t(100)     /* do not change */
 #define VS1053_PLAYBUFFER_SIZE size_t(32) /* do not change */
 
 extern void audio_showstation(const char *) __attribute__((weak));
 extern void audio_eof_stream(const char *) __attribute__((weak));
 extern void audio_showstreamtitle(const char *) __attribute__((weak));
+extern void audio_connect_result(const int16_t) __attribute__((weak));
 
 class ESP32_VS1053_Stream
 {

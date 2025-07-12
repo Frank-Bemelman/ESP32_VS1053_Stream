@@ -188,12 +188,15 @@ bool ESP32_VS1053_Stream::connecttohost(const char *url, const char *username,
     { // hacky solution: some items on radio-browser.info has
       // non resolving names that contain './' in their hostname
         log_e("Invalid url not started");
+        audio_connect_result(FAIL_INVALID_URL);
         return false;
     }
 
     _http = new HTTPClient;
     if (!_http)
-        return false;
+    { audio_connect_result(FAIL_HTTP_CLIENT);
+      return false;
+    }    
 
     _http->setConnectTimeout(tolower(url[4]) == 's' ? VS1053_CONNECT_TIMEOUT_MS_SSL
                                                     : VS1053_CONNECT_TIMEOUT_MS);
@@ -230,6 +233,7 @@ bool ESP32_VS1053_Stream::connecttohost(const char *url, const char *username,
         {
             log_w("Could not connect to %s", url);
             stopSong();
+            audio_connect_result(FAIL_CONNECTING);
             return false;
         }
     }
@@ -274,6 +278,7 @@ bool ESP32_VS1053_Stream::connecttohost(const char *url, const char *username,
             if (!_canRedirect())
             {
                 stopSong();
+                audio_connect_result(FAIL_PLAYLIST_CANT_REDIRECT);
                 return false;
             }
             WiFiClient *stream = _http->getStreamPtr();
@@ -281,6 +286,7 @@ bool ESP32_VS1053_Stream::connecttohost(const char *url, const char *username,
             {
                 log_e("No stream handle");
                 stopSong();
+                audio_connect_result(FAIL_NO_STREAM_HANDLE);
                 return false;
             }
             const auto BYTES_TO_READ = min(stream->available(), VS1053_MAX_PLAYLIST_READ);
@@ -288,6 +294,7 @@ bool ESP32_VS1053_Stream::connecttohost(const char *url, const char *username,
             {
                 log_e("playlist contains no data");
                 stopSong();
+                audio_connect_result(FAIL_PLAYLIST_NO_DATA);
                 return false;
             }
             char file[BYTES_TO_READ + 1];
@@ -298,6 +305,7 @@ bool ESP32_VS1053_Stream::connecttohost(const char *url, const char *username,
             {
                 log_e("playlist contains no url");
                 stopSong();
+                audio_connect_result(FAIL_PLAYLIST_NO_URL);
                 return false;
             }
             strtok(newurl, "\r\n;?");
@@ -323,6 +331,7 @@ bool ESP32_VS1053_Stream::connecttohost(const char *url, const char *username,
         {
             log_e("closing - unsupported mimetype: '%s'", CONTENT.c_str());
             stopSong();
+            audio_connect_result(FAIL_UNSUPPORTED_MIME);
             return false;
         }
 
@@ -343,6 +352,7 @@ bool ESP32_VS1053_Stream::connecttohost(const char *url, const char *username,
         log_d("redirected %i times", _redirectCount);
         _redirectCount = 0;
         _allocateRingbuffer();
+        audio_connect_result(result); // actually reporting succes here
         return true;
     }
 
@@ -352,6 +362,7 @@ bool ESP32_VS1053_Stream::connecttohost(const char *url, const char *username,
         if (!_canRedirect())
         {
             stopSong();
+            audio_connect_result(FAIL_CANT_REDIRECT);
             return false;
         }
         if (_http->hasHeader(LOCATION) && _http->header(LOCATION).indexOf("./") == -1)
@@ -367,11 +378,13 @@ bool ESP32_VS1053_Stream::connecttohost(const char *url, const char *username,
         log_e("Something went wrong redirecting from %s", url);
         _redirectCount = 0;
         stopSong();
+        audio_connect_result(result);
         return false;
 
     default:
         log_e("error %i %s", result, _http->errorToString(result).c_str());
         stopSong();
+        audio_connect_result(result);
         return false;
     }
 }
