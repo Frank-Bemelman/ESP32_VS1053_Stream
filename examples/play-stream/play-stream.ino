@@ -78,3 +78,12 @@ void audio_showstreamtitle(const char* info) {
 void audio_eof_stream(const char* info) {
     Serial.printf("End of stream: %s\n", info);
 }
+
+void audio_connect_result(const int16_t result) {
+    if(result_type>=1000)
+    { Serial.printf("stream.connecttohost() result (Failure) : %d\n", result_type);
+    }
+    else
+    { Serial.printf("stream.connecttohost() result (HTTP Return Code) : %d\n", result_type);
+    }
+}
