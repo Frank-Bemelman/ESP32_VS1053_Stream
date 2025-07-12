@@ -81,9 +81,9 @@ void audio_eof_stream(const char* info) {
 
 void audio_connect_result(const int16_t result) {
     if(result>=1000)
-    { Serial.printf("stream.connecttohost() result (Failure) : %d\n", result_type);
+    { Serial.printf("stream.connecttohost() result (Failure) : %d\n", result);
     }
     else
-    { Serial.printf("stream.connecttohost() result (HTTP Return Code) : %d\n", result_type);
+    { Serial.printf("stream.connecttohost() result (HTTP Return Code) : %d\n", result);
     }
 }
