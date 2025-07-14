@@ -23,7 +23,7 @@
 #define VS1053_PSRAM_BUFFER_SIZE size_t(1024 * 64)
 #define VS1053_PSRAM_MAX_MOVE size_t(1024 * 4)
 
-// possible connect result types enumeration
+// possible connect results/problems types enumeration
 #define FAIL_INVALID_URL 1000
 #define FAIL_HTTP_CLIENT 1001
 #define FAIL_CONNECTING  1002 
@@ -33,6 +33,11 @@
 #define FAIL_PLAYLIST_NO_URL 1006
 #define FAIL_UNSUPPORTED_MIME 1007
 #define FAIL_CANT_REDIRECT 1008
+#define FAIL_LOOP_NO_HTTP_CLIENT 1009
+#define FAIL_LOOP_HTTP_DISCONNECT 1010
+#define FAIL_LOOP_CONNECTION_LOST 1011
+#define FAIL_LOOP_STREAM_TIMEOUT 1012
+#define FAIL_LOOP_EOF_NO_REMAINING_BYTES 1013
 
 
 

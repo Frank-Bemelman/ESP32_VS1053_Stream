@@ -656,11 +656,14 @@ void ESP32_VS1053_Stream::loop()
     }
 
     if (!_http)
+    {   // audio_connect_result(FAIL_LOOP_NO_HTTP_CLIENT);  
         return;
+    }    
 
     if (!_http->connected())
     {
         log_e("Stream disconnect");
+        audio_connect_result(FAIL_LOOP_HTTP_DISCONNECT); 
         _eofStream();
         return;
     }
@@ -669,6 +672,8 @@ void ESP32_VS1053_Stream::loop()
     if (!_ringbuffer_handle && !stream)
     {
         log_e("Stream connection lost");
+        audio_connect_result(FAIL_LOOP_CONNECTION_LOST);
+
         _eofStream();
         return;
     }
@@ -684,6 +689,7 @@ void ESP32_VS1053_Stream::loop()
         if (millis() - _streamStalledTime > VS1053_NOBUFFER_TIMEOUT_MS)
         {
             log_e("Stream timeout %lu ms", VS1053_NOBUFFER_TIMEOUT_MS);
+            audio_connect_result(FAIL_LOOP_STREAM_TIMEOUT);
             _eofStream();
             return;
         }
@@ -725,7 +731,9 @@ void ESP32_VS1053_Stream::loop()
     }
 
     if (!_remainingBytes)
+    {    audio_connect_result(FAIL_LOOP_EOF_NO_REMAINING_BYTES);
         _eofStream();
+    }    
 }
 
 bool ESP32_VS1053_Stream::isRunning()
