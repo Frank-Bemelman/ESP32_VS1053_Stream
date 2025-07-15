@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiClient.h>
+#include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <FS.h>
 #include <freertos/ringbuf.h>
@@ -24,6 +25,7 @@
 #define VS1053_PSRAM_MAX_MOVE size_t(1024 * 4)
 
 // possible connect results/problems types enumeration
+#define FAIL_ENUM_START 1000
 #define FAIL_INVALID_URL 1000
 #define FAIL_HTTP_CLIENT 1001
 #define FAIL_CONNECTING  1002 
@@ -38,9 +40,7 @@
 #define FAIL_LOOP_CONNECTION_LOST 1011
 #define FAIL_LOOP_STREAM_TIMEOUT 1012
 #define FAIL_LOOP_EOF_NO_REMAINING_BYTES 1013
-
-
-
+#define FAIL_LOOP_EOF_NO_REMAINING_BYTES_HTTPS 1014
 
 #define VS1053_MAXVOLUME uint8_t(100)     /* do not change */
 #define VS1053_PLAYBUFFER_SIZE size_t(32) /* do not change */

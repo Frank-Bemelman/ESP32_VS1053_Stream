@@ -317,6 +317,9 @@ bool ESP32_VS1053_Stream::connecttohost(const char *url, const char *username,
         else if (CONTENT.equals("audio/mpeg"))
             _currentCodec = MP3;
 
+        else if (CONTENT.equals("audio/mp3"))
+            _currentCodec = MP3;
+
         else if (CONTENT.equals("audio/ogg") ||
                  CONTENT.equals("application/ogg"))
             _currentCodec = OGG;
@@ -731,7 +734,8 @@ void ESP32_VS1053_Stream::loop()
     }
 
     if (!_remainingBytes)
-    {    audio_connect_result(FAIL_LOOP_EOF_NO_REMAINING_BYTES);
+    {    if(_url[4]=='s')audio_connect_result(FAIL_LOOP_EOF_NO_REMAINING_BYTES_HTTPS);
+         else audio_connect_result(FAIL_LOOP_EOF_NO_REMAINING_BYTES);
         _eofStream();
     }    
 }
