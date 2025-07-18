@@ -330,6 +330,9 @@ bool ESP32_VS1053_Stream::connecttohost(const char *url, const char *username,
         else if (CONTENT.equals("audio/aacp"))
             _currentCodec = AACP;
 
+        else if (CONTENT.equals(""))
+            _currentCodec = MP3;
+
         else
         {
             log_e("closing - unsupported mimetype: '%s'", CONTENT.c_str());
@@ -791,7 +794,7 @@ void ESP32_VS1053_Stream::setTone(uint8_t *rtone)
 
 const char *ESP32_VS1053_Stream::currentCodec()
 {
-    const char *name[] = {"STOPPED", "MP3", "OGG", "AAC", "AAC+"};
+    const char *name[] = {"STOPPED", "MP3", "OGG", "AAC", "AACP"};
     return name[_currentCodec];
 }
 
