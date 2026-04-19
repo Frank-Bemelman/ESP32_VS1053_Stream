@@ -261,23 +261,35 @@ bool ESP32_VS1053_Stream::connectToHost(const char *url, const char *username,
     return connectToHost(url, username, pwd, 0);
 }
 
+
+int ESP32_VS1053_Stream::connectResult()
+{ return _connectresult;
+}
+
+int ESP32_VS1053_Stream::connectResult(uint16_t *reason)
+{ *reason = _eofstreamreason;
+  return connectResult();
+}
+
 bool ESP32_VS1053_Stream::connectToHost(const char *url, const char *username,
                                         const char *pwd, size_t offset)
 {
     if (!_vs1053 || _http || _playingFile || !WiFi.isConnected() ||
         strncasecmp(url, "http", 4) != 0)
+    {   _connectresult = FAIL_INVALID_URL;    
         return false;
+    }    
 
     const size_t length = strlen(url);
     if (length >= sizeof(_url) || length < 8) // "http://"
-    {
+    {   _connectresult = FAIL_INVALID_URL_LENGTH;
         log_e("Url invalid length");
         return false;
     }
 
     _http = new HTTPClient;
     if (!_http)
-    {
+    {   _connectresult = FAIL_HTTP_CLIENT_CREATE;
         log_e("Could not create http client");
         return false;
     }
@@ -286,6 +298,7 @@ bool ESP32_VS1053_Stream::connectToHost(const char *url, const char *username,
 
     if (needsEscape && !_escapeUrl(url, length))
     {
+        _connectresult = FAIL_HTTP_ESC_URL_BUFFER;
         log_e("Escaped URL exceeds buffer");
         return false;
     }
@@ -297,7 +310,8 @@ bool ESP32_VS1053_Stream::connectToHost(const char *url, const char *username,
 
     const char *finalUrl = needsEscape ? reinterpret_cast<const char *>(_localbuffer) : url;
     if (!_http->begin(finalUrl))
-    {
+    {   
+        _connectresult = FAIL_CONNECT_FAILED;
         log_w("Could not connect to %s", url);
         stopSong();
         return false;
@@ -318,6 +332,8 @@ bool ESP32_VS1053_Stream::connectToHost(const char *url, const char *username,
     _http->setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
 
     const int HTTPresult = _http->GET();
+    
+    _connectresult = HTTPresult;
 
     switch (HTTPresult)
     {
@@ -331,7 +347,7 @@ bool ESP32_VS1053_Stream::connectToHost(const char *url, const char *username,
             snprintf(_url, sizeof(_url), "%s", url);
 
             if (!_canRedirect())
-            {
+            {   _eofstreamreason = FAIL_PLAYLIST_CANT_REDIRECT;
                 _eofStream();
                 _redirectCount = 0;
                 return false;
@@ -346,6 +362,7 @@ bool ESP32_VS1053_Stream::connectToHost(const char *url, const char *username,
             }
 
             // no url found
+            _eofstreamreason = FAIL_PLAYLIST_NO_URL;
             _eofStream();
             _redirectCount = 0;
             return false;
@@ -375,6 +392,7 @@ bool ESP32_VS1053_Stream::connectToHost(const char *url, const char *username,
         snprintf(_url, sizeof(_url), "%s", url);
         if (!_canRedirect())
         {
+            _eofstreamreason = FAIL_CANT_REDIRECT;
             _eofStream();
             _redirectCount = 0;
             return false;
@@ -383,6 +401,7 @@ bool ESP32_VS1053_Stream::connectToHost(const char *url, const char *username,
         if (!_http->hasHeader(LOCATION))
         {
             log_e("No location header redirecting from %s", url);
+            _eofstreamreason = FAIL_NO_LOCATION_HEADER;
             _eofStream();
             _redirectCount = 0;
             return false;
@@ -691,7 +710,9 @@ void ESP32_VS1053_Stream::_feedDecoder(WiFiClient *stream)
         _handleStream(stream);
 
     if (!_remainingBytes)
+    {   _eofstreamreason = FAIL_LOOP_EOF_NO_REMAINING_BYTES;
         _eofStream();
+    }    
 }
 
 void ESP32_VS1053_Stream::loop()
@@ -710,7 +731,9 @@ void ESP32_VS1053_Stream::loop()
         if (_remainingBytes)
             _playFromRingBuffer();
         else
+        {   _eofstreamreason = FAIL_LOOP_EOF_NO_REMAINING_BYTES;
             _eofStream();
+        }    
         return;
     }
 
@@ -718,6 +741,7 @@ void ESP32_VS1053_Stream::loop()
     if (!stream)
     {
         log_e("Stream connection lost");
+        _eofstreamreason = FAIL_LOOP_CONNECTION_LOST;
         _eofStream();
         return;
     }
@@ -868,10 +892,14 @@ bool ESP32_VS1053_Stream::connectToFile(fs::FS &fs, const char *filename, const 
     const char *ext = strrchr(filename, '.');
     if (ext && strcasecmp(ext, ".wav") == 0)
         _remainingBytes = _fileLastWAVByte() - offset;
+    else if (ext && strcasecmp(ext, ".mp3") == 0)
+        _remainingBytes = _fileLastMP3Byte() - offset;        
     else
         _remainingBytes = _file.size() - offset;
 
-    _file.seek(offset);
+    
+    if(offset>_file.position())_file.seek(offset);
+    
     if (strcmp(filename, _url))
     {
         _vs1053->stopSong();
@@ -917,11 +945,38 @@ size_t ESP32_VS1053_Stream::_fileLastWAVByte()
     return _file.size();
 }
 
+size_t ESP32_VS1053_Stream::_fileLastMP3Byte()
+{ uint8_t ID3v2_header[10];
+  size_t  ID3v2_size = 0;
+
+   if (_file.read(ID3v2_header, 10) == 10)
+   { if(memcmp(ID3v2_header, "ID3", 3 )==0)
+     { Serial.printf("ID3v2_header[9] -> %02X\n", ID3v2_header[9]);
+       ID3v2_size |= (size_t)ID3v2_header[9];
+       Serial.printf("ID3v2_header[8] -> %02X\n", ID3v2_header[8]);
+       ID3v2_size |= (size_t)ID3v2_header[8] << 7;
+       Serial.printf("ID3v2_header[7] -> %02X\n", ID3v2_header[7]);
+       ID3v2_size |= (size_t)ID3v2_header[7] << 14;
+       Serial.printf("ID3v2_header[6] -> %02X\n", ID3v2_header[6]);
+       ID3v2_size |= (size_t)ID3v2_header[6] << 21;
+
+       _file.seek(ID3v2_size + 10);
+       Serial.printf("_file.position() -> %08X\n", _file.position());
+     }  
+
+     return _file.size() - _file.position();   
+   }
+   // fallback if not found
+   _file.seek(0);
+   return _file.size();
+ }
+
 void ESP32_VS1053_Stream::_handleLocalFile()
 {
     if (!_file)
-    {
+    {   
         log_e("file error");
+        _eofstreamreason = FAIL_LOOP_NO_FILE;
         _eofStream();
         return;
     }
@@ -963,7 +1018,9 @@ void ESP32_VS1053_Stream::_handleLocalFile()
     if (_remainingBytes)
         _playFromRingBuffer();
     else
+    {   _eofstreamreason = FAIL_LOOP_END_OF_FILE;
         _eofStream();
+    }   
 }
 
 void ESP32_VS1053_Stream::_handleLocalFileNoPSRAM()
@@ -981,7 +1038,8 @@ void ESP32_VS1053_Stream::_handleLocalFileNoPSRAM()
             _bufferIndex = 0;
 
             if (_bufferFill == 0)
-            {
+            {   
+                _eofstreamreason = FAIL_LOOP_FILE_READ_FAIL;
                 log_e("file read failed");
                 _eofStream();
                 return;
@@ -992,6 +1050,7 @@ void ESP32_VS1053_Stream::_handleLocalFileNoPSRAM()
         else
         {
             // Nothing left to read AND buffer empty
+            _eofstreamreason = FAIL_LOOP_BUFFER_EMPTY;
             _eofStream();
             return;
         }
