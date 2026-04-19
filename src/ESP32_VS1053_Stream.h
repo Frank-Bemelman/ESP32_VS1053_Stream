@@ -22,6 +22,27 @@
 #define VS1053_PSRAM_BUFFER_TIMEOUT_MS 900
 #define VS1053_PSRAM_BUFFER_SIZE 65536
 
+#define FAIL_INVALID_URL 1000
+#define FAIL_INVALID_URL_LENGTH 1001
+#define FAIL_HTTP_CLIENT_CREATE 1002
+#define FAIL_HTTP_ESC_URL_BUFFER 1003
+#define FAIL_CONNECT_FAILED 1004
+#define FAIL_PLAYLIST_CANT_REDIRECT 1005
+#define FAIL_NO_STREAM_HANDLE 1006
+#define FAIL_PLAYLIST_NO_DATA 1007
+#define FAIL_PLAYLIST_NO_URL 1008
+#define FAIL_CANT_REDIRECT 1009
+#define FAIL_NO_LOCATION_HEADER 1010
+#define FAIL_LOOP_NO_HTTP_CLIENT 1011
+#define FAIL_LOOP_HTTP_DISCONNECT 1012
+#define FAIL_LOOP_CONNECTION_LOST 1013
+#define FAIL_LOOP_STREAM_TIMEOUT 1014
+#define FAIL_LOOP_EOF_NO_REMAINING_BYTES 1015
+#define FAIL_LOOP_NO_FILE 1016
+#define FAIL_LOOP_END_OF_FILE 1017
+#define FAIL_LOOP_FILE_READ_FAIL 1018
+#define FAIL_LOOP_BUFFER_EMPTY 1019
+
 constexpr size_t VS1053_LOCALBUFFER_SIZE = 4096; // need at least 4kB to safely receive ICY metadata
 constexpr uint8_t VS1053_MAXVOLUME = 100;
 constexpr size_t VS1053_PLAYBUFFER_SIZE = 32;
@@ -88,6 +109,9 @@ public:
     size_t position();
 
     void bufferStatus(size_t &used, size_t &capacity);
+    
+    int connectResult();
+    int connectResult(uint16_t *reason);
 
     void setTone(uint8_t *rtone);
     /*  Bass/Treble: void setTone(uint8_t *rtone);
@@ -164,6 +188,7 @@ private:
     uint32_t _bitrate = 0;
 
     size_t _fileLastWAVByte();
+    size_t _fileLastMP3Byte();
 
     size_t _bufferIndex = 0;
     size_t _bufferFill = 0;
@@ -193,6 +218,9 @@ private:
          ICY_METAINT,
          ENCODING,
          LOCATION};
+         
+    int _connectresult = 0;
+    uint16_t _eofstreamreason = 0;          
 };
 
 #endif
