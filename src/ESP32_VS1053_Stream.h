@@ -12,8 +12,8 @@
 
 #define VS1053_INITIALVOLUME 95
 #define VS1053_ICY_METADATA true
-#define VS1053_CONNECT_TIMEOUT_MS 500
-#define VS1053_CONNECT_TIMEOUT_MS_SSL 1000
+#define VS1053_CONNECT_TIMEOUT_MS 5000
+#define VS1053_CONNECT_TIMEOUT_MS_SSL 5000
 #define VS1053_STREAM_TIMEOUT_MS 900
 #define VS1053_MAX_URL_LENGTH 2048
 #define VS1053_MAX_REDIRECT_COUNT 3
@@ -56,7 +56,9 @@ public:
 
     bool connectToFile(fs::FS &fs, const char *filename);
     bool connectToFile(fs::FS &fs, const char *filename, const size_t offset);
-
+    
+    void playChunk(uint8_t *buffer, size_t bytes_to_play);
+    
     void setCodecCB(codec_callback_t cb);
     void clearCodecCB();
 
@@ -84,6 +86,8 @@ public:
     uint8_t getVolume();
 
     void setVolume(const uint8_t newVolume); /* 0-100 */
+    
+    void forceVolume(const uint8_t newVolume); /* 0-100 */
 
     const char *lastUrl();
 
@@ -170,6 +174,7 @@ private:
     uint32_t _bitrate = 0;
 
     size_t _fileLastWAVByte();
+    size_t _fileLastMP3Byte();
 
     size_t _bufferIndex = 0;
     size_t _bufferFill = 0;

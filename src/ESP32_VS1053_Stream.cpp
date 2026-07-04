@@ -827,7 +827,9 @@ bool ESP32_VS1053_Stream::isRunning()
 void ESP32_VS1053_Stream::stopSong()
 {
     if (!_http && !_playingFile)
+    { _vs1053->switchToMp3Mode();
         return;
+    }    
 
     _vs1053->setVolume(0);
     _remainingBytes = 0;
@@ -856,6 +858,7 @@ void ESP32_VS1053_Stream::stopSong()
     {
         _file.close();
         _playingFile = false;
+        _vs1053->switchToMp3Mode();
         return;
     }
 
@@ -864,6 +867,7 @@ void ESP32_VS1053_Stream::stopSong()
     _http = nullptr;
     _bytesLeftInChunk = 0;
     _dataSeen = false;
+    _vs1053->switchToMp3Mode();
 }
 
 uint8_t ESP32_VS1053_Stream::getVolume()
@@ -877,6 +881,14 @@ void ESP32_VS1053_Stream::setVolume(const uint8_t newVolume)
     if (_vs1053 && isRunning())
         _vs1053->setVolume(_volume);
 }
+
+void ESP32_VS1053_Stream::forceVolume(const uint8_t newVolume)
+{ uint8_t volume;
+    volume = min(VS1053_MAXVOLUME, newVolume);
+    if (_vs1053)
+        _vs1053->setVolume(volume);
+}
+
 
 void ESP32_VS1053_Stream::setTone(uint8_t *rtone)
 {
@@ -958,10 +970,12 @@ bool ESP32_VS1053_Stream::connectToFile(fs::FS &fs, const char *filename, const 
     const char *ext = strrchr(filename, '.');
     if (ext && strcasecmp(ext, ".wav") == 0)
         _remainingBytes = _fileLastWAVByte() - offset;
+    else if (ext && strcasecmp(ext, ".mp3") == 0)
+        _remainingBytes = _fileLastMP3Byte() - offset;    
     else
         _remainingBytes = _file.size() - offset;
 
-    _file.seek(offset);
+    //_file.seek(offset);
     if (strcmp(filename, _url))
     {
         _vs1053->stopSong();
@@ -974,6 +988,15 @@ bool ESP32_VS1053_Stream::connectToFile(fs::FS &fs, const char *filename, const 
     _bitrateTimer = millis();
 
     return true;
+}
+
+
+
+
+void ESP32_VS1053_Stream::playChunk(uint8_t *buffer, size_t bytes_to_play)
+{  _vs1053->setVolume(_volume);
+   _vs1053->playChunk(buffer, bytes_to_play);
+   //_vs1053->setVolume(0); // mutes too early, don't do it
 }
 
 size_t ESP32_VS1053_Stream::_fileLastWAVByte()
@@ -1005,6 +1028,32 @@ size_t ESP32_VS1053_Stream::_fileLastWAVByte()
     // fallback if not found
     return _file.size();
 }
+
+size_t ESP32_VS1053_Stream::_fileLastMP3Byte()
+{ uint8_t ID3v2_header[10];
+  size_t  ID3v2_size = 0;
+
+   if (_file.read(ID3v2_header, 10) == 10)
+   { if(memcmp(ID3v2_header, "ID3", 3 )==0)
+     { Serial.printf("ID3v2_header[9] -> %02X\n", ID3v2_header[9]);
+       ID3v2_size |= (size_t)ID3v2_header[9];
+       Serial.printf("ID3v2_header[8] -> %02X\n", ID3v2_header[8]);
+       ID3v2_size |= (size_t)ID3v2_header[8] << 7;
+       Serial.printf("ID3v2_header[7] -> %02X\n", ID3v2_header[7]);
+       ID3v2_size |= (size_t)ID3v2_header[7] << 14;
+       Serial.printf("ID3v2_header[6] -> %02X\n", ID3v2_header[6]);
+       ID3v2_size |= (size_t)ID3v2_header[6] << 21;
+
+       _file.seek(ID3v2_size + 10);
+       Serial.printf("_file.position() -> %08X\n", _file.position());
+     }  
+     
+     return _file.size() - _file.position();   
+   }
+   // fallback if not found
+   _file.seek(0);
+   return _file.size();
+ }
 
 void ESP32_VS1053_Stream::_handleLocalFile()
 {
