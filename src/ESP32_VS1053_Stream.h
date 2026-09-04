@@ -5,27 +5,33 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <HTTPClient.h>
+
+
 #include <FS.h>
 #include <freertos/ringbuf.h>
 #include <esp_heap_caps.h>
 #include <VS1053.h> /* https://github.com/baldram/ESP_VS1053_Library */
 
+#include <mutex>
+
 #define VS1053_INITIALVOLUME 95
 #define VS1053_ICY_METADATA true
 #define VS1053_CONNECT_TIMEOUT_MS 500
 #define VS1053_CONNECT_TIMEOUT_MS_SSL 1000
-#define VS1053_STREAM_TIMEOUT_MS 700
+#define VS1053_STREAM_TIMEOUT_MS 1900
 #define VS1053_MAX_URL_LENGTH 2048
 #define VS1053_MAX_REDIRECT_COUNT 3
 
 #define VS1053_PSRAM_BUFFER_ENABLED true
-#define VS1053_PSRAM_BUFFER_SIZE 65536
-#define VS1053_PSRAM_BUFFER_LOW 32768
-#define VS1053_PSRAM_BUFFER_TIMEOUT_MS 10
+#define VS1053_PSRAM_BUFFER_TIMEOUT_MS 100 // see the occassional ringbuffer empty, gave it a bit more time, 100, this value was 10
+#define VS1053_PSRAM_BUFFER_SIZE (65536*1)
+//#define VS1053_PSRAM_BUFFER_SIZE (32768)
+//#define VS1053_PSRAM_BUFFER_SIZE (2048)
+#define VS1053_INTERNAL_RAM_BUFFER_SIZE 2048 // used when no PSRAM
 
-constexpr size_t VS1053_LOCALBUFFER_SIZE = 4096; // need at least 4kB to safely receive ICY metadata
+constexpr size_t VS1053_LOCALBUFFER_SIZE = 4096; // need at least 4kB to safely receive ICY metadata // was 4096
 constexpr uint8_t VS1053_MAXVOLUME = 100;
-constexpr size_t VS1053_PLAYBUFFER_SIZE = 32;
+constexpr size_t VS1053_PLAYBUFFER_SIZE = 32; 
 
 static_assert(VS1053_LOCALBUFFER_SIZE >= 4096,
               "VS1053_LOCALBUFFER_SIZE must be equal or greater than 4096");
@@ -39,6 +45,7 @@ typedef void (*bitrate_callback_t)(uint32_t bitrate);
 typedef void (*streaminfo_callback_t)(const char *info);
 typedef void (*eof_callback_t)(const char *url);
 typedef void (*error_callback_t)(const char *error);
+typedef void (*filllevel_callback_t)(uint32_t filllevel);
 
 class ESP32_VS1053_Stream
 {
@@ -58,6 +65,12 @@ public:
     bool connectToFile(fs::FS &fs, const char *filename);
     bool connectToFile(fs::FS &fs, const char *filename, const size_t offset);
 
+    void _playFromRingBuffer();
+
+    
+    
+    
+
     void setCodecCB(codec_callback_t cb);
     void clearCodecCB();
 
@@ -76,6 +89,9 @@ public:
     void setErrorCB(error_callback_t cb);
     void clearErrorCB();
 
+    void setFilllevelCB(bitrate_callback_t cb);
+    void clearFilllevelCB();
+
     void loop();
 
     bool isRunning();
@@ -85,8 +101,12 @@ public:
     uint8_t getVolume();
 
     void setVolume(const uint8_t newVolume); /* 0-100 */
+    
+    uint8_t getVuMeter(); /* 0-31 */
 
     const char *lastUrl();
+
+    VS1053 *getVS1053pointer();
 
     size_t size();
 
@@ -103,8 +123,8 @@ public:
         e.g. uint8_t rtone[4]  = {12, 15, 15, 15}; // initialize bass & treble
         See https://www.vlsi.fi/fileadmin/datasheets/vs1053.pdf section 9.6.3 */
 
-    bool playChunk(uint8_t *data, size_t len, bool stopSong = true);
-    bool playChunkNB(uint8_t *chunk, size_t len, bool stopChunk = true);
+    bool playChunk(uint8_t *data, size_t len, bool stopSong = true);    
+    bool playChunkNB(uint8_t *chunk, size_t len, bool looparound = false);
 
 
 private:
@@ -117,6 +137,9 @@ private:
     RingbufHandle_t _ringbuffer_handle;
     StaticRingbuffer_t *_buffer_struct;
     uint8_t *_buffer_storage;
+    StaticRingbuffer_t buffer_struct; // 216 bytes structure
+
+    std::mutex _classMutex;      
 
     File _file;
     bool _playingFile = false;
@@ -130,24 +153,22 @@ private:
     bool _isPlaylistContentType();
     const char *_parsePlaylist();
     void _setupStream();
-    void _handleStream(WiFiClient *stream);
-    void _handleMetaData(WiFiClient *stream);
     void _handleChunkedStream(WiFiClient *stream);
     bool _handleChunkedMetadata(WiFiClient *stream);
     void _handleLocalFile();
-    void _handleLocalFileNoPSRAM();
-    void _feedDecoder(WiFiClient *stream);
     void _allocateRingbuffer();
     void _deallocateRingbuffer();
-    void _playFromRingBuffer();
-    void _streamToRingBuffer(WiFiClient *stream);
+    // void _playFromRingBuffer(); // moved to public, gets called from AudioPlayTask now
     void _chunkedStreamToRingBuffer(WiFiClient *stream);
 
     bool _playChunkNB();
-    bool _stopChunk = false;
     uint8_t *_chunk = nullptr;
+    size_t _chunkLen = 0;
     size_t _chunkRemaining = 0;
-    bool _playingChunk = false;
+    bool _playingChunk = false; 
+    uint8_t *_chunkLoop = nullptr;
+    bool _looparound = false;
+
 
     codec_callback_t _codecCallback = nullptr;
     bitrate_callback_t _bitrateCallback = nullptr;
@@ -155,6 +176,9 @@ private:
     streaminfo_callback_t _infoCallback = nullptr;
     eof_callback_t _eofCallback = nullptr;
     error_callback_t _errorCallback = nullptr;
+    filllevel_callback_t _filllevelCallback = nullptr;
+
+    
 
     enum Codec
     {
@@ -172,17 +196,22 @@ private:
 
     const uint8_t SCI_HDAT0 = 0x08;
     const uint8_t SCI_HDAT1 = 0x09;
+    const uint8_t SCI_AICTRL3 = 0x0F;
+    const uint8_t SCI_STATUS = 0x01;
 
     uint8_t _codec = CODEC_UNKNOWN;
     void _updateBitRate();
+    void _updateFillLevel();
     bool _isAudioFile(File &f);
     void _readBitRate();
     const char *_codecName(uint8_t codec);
     unsigned long _bitrateTimer = 0;
     uint8_t _decoderSyncAttempts = 0;
     uint32_t _bitrate = 0;
+    uint32_t _filllevel = 0;
 
     size_t _fileLastWAVByte();
+    size_t _fileLastMP3Byte();
 
     size_t _bufferIndex = 0;
     size_t _bufferFill = 0;
