@@ -23,13 +23,10 @@
 #define VS1053_MAX_REDIRECT_COUNT 3
 
 #define VS1053_PSRAM_BUFFER_ENABLED true
-#define VS1053_PSRAM_BUFFER_TIMEOUT_MS 100 // see the occassional ringbuffer empty, gave it a bit more time, 100, this value was 10
-#define VS1053_PSRAM_BUFFER_SIZE (65536*1)
-//#define VS1053_PSRAM_BUFFER_SIZE (32768)
-//#define VS1053_PSRAM_BUFFER_SIZE (2048)
+#define VS1053_PSRAM_BUFFER_SIZE 65536
 #define VS1053_INTERNAL_RAM_BUFFER_SIZE 2048 // used when no PSRAM
 
-constexpr size_t VS1053_LOCALBUFFER_SIZE = 4096; // need at least 4kB to safely receive ICY metadata // was 4096
+constexpr size_t VS1053_LOCALBUFFER_SIZE = 4096; // need at least 4kB to safely receive ICY metadata
 constexpr uint8_t VS1053_MAXVOLUME = 100;
 constexpr size_t VS1053_PLAYBUFFER_SIZE = 32; 
 
