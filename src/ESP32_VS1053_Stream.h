@@ -64,10 +64,6 @@ public:
 
     void _playFromRingBuffer();
 
-    
-    
-    
-
     void setCodecCB(codec_callback_t cb);
     void clearCodecCB();
 
@@ -166,7 +162,6 @@ private:
     uint8_t *_chunkLoop = nullptr;
     bool _looparound = false;
 
-
     codec_callback_t _codecCallback = nullptr;
     bitrate_callback_t _bitrateCallback = nullptr;
     station_callback_t _stationCallback = nullptr;
@@ -174,8 +169,6 @@ private:
     eof_callback_t _eofCallback = nullptr;
     error_callback_t _errorCallback = nullptr;
     filllevel_callback_t _filllevelCallback = nullptr;
-
-    
 
     enum Codec
     {
