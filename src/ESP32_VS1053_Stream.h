@@ -28,7 +28,7 @@
 
 constexpr size_t VS1053_LOCALBUFFER_SIZE = 4096; // need at least 4kB to safely receive ICY metadata
 constexpr uint8_t VS1053_MAXVOLUME = 100;
-constexpr size_t VS1053_PLAYBUFFER_SIZE = 32; 
+constexpr size_t VS1053_PLAYBUFFER_SIZE = 32;
 
 static_assert(VS1053_LOCALBUFFER_SIZE >= 4096,
               "VS1053_LOCALBUFFER_SIZE must be equal or greater than 4096");
@@ -116,7 +116,7 @@ public:
         e.g. uint8_t rtone[4]  = {12, 15, 15, 15}; // initialize bass & treble
         See https://www.vlsi.fi/fileadmin/datasheets/vs1053.pdf section 9.6.3 */
 
-    bool playChunk(uint8_t *data, size_t len, bool stopSong = true);    
+    bool playChunk(uint8_t *data, size_t len, bool stopSong = true);
     bool playChunkNB(uint8_t *chunk, size_t len, bool looparound = false);
 
 
